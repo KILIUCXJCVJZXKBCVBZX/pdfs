@@ -135,15 +135,34 @@ class FeatureEngineer:
         
         text_features = np.array(text_features)
         
-        # Combine all features
+        # FIXED: Ensure all arrays have the same number of rows (samples)
+        n_samples = len(texts)
+        
+        # Convert TF-IDF to dense array
+        tfidf_dense = tfidf_features.toarray()
+        
+        # Ensure keyword_features and text_features have correct shape
+        if keyword_features.shape[0] != n_samples:
+            print(f"Warning: keyword_features shape mismatch. Expected {n_samples}, got {keyword_features.shape[0]}")
+            keyword_features = keyword_features[:n_samples] if keyword_features.shape[0] > n_samples else keyword_features
+        
+        if text_features.shape[0] != n_samples:
+            print(f"Warning: text_features shape mismatch. Expected {n_samples}, got {text_features.shape[0]}")
+            text_features = text_features[:n_samples] if text_features.shape[0] > n_samples else text_features
+        
+        # Debug: Print shapes before concatenation
+        print(f"Feature shapes - TF-IDF: {tfidf_dense.shape}, Keywords: {keyword_features.shape}, Text: {text_features.shape}")
+        
+        # Combine all features - FIXED: Only include the defined features
         combined_features = np.hstack([
-            tfidf_features.toarray(), 
+            tfidf_dense, 
             keyword_features,
             text_features
         ])
         
+        print(f"Combined features shape: {combined_features.shape}")
+        
         return combined_features
-
 def prepare_combined_text(df: pd.DataFrame, desc_col: str = 'description', remark_col: str = 'remark') -> pd.DataFrame:
     """Prepare combined text from description and remark columns"""
     df = df.copy()
@@ -185,6 +204,35 @@ class EnhancedHierarchicalClassifier:
         self.training_hierarchy = {}  # Built from training data
         self.full_hierarchy = {}     # Complete Maximo hierarchy (fallback)
         self.path_frequencies = {}   # Track frequency of paths in training
+
+        self.concept_mappings = {
+            'plumbing_concepts': {
+                'keywords': ['water', 'heater', 'pipe', 'leak', 'plumbing', 'supply', 'drain', 
+                           'faucet', 'toilet', 'shower', 'hot water', 'cold water', 'pressure'],
+                'failure_classes': ['PLUMBING', 'Pipe', 'Water Supply'],
+                'problems': ['Water heater not working', 'Leakage', 'Water Leak', 'No Hot Water'],
+                'causes': ['Water heater defected', 'Leakage In System', 'Pipe Damage'],
+                'remedies': ['Replace', 'Repair/Replace', 'Fix Leak']
+            },
+            'electrical_concepts': {
+                'keywords': ['power', 'electrical', 'circuit', 'breaker', 'wiring', 'voltage',
+                           'switch', 'outlet', 'lighting', 'heater'],
+                'failure_classes': ['CIRCUIT BREAKER', 'Heater', 'Lighting Systems'],
+                'problems': ['Not Working', 'Unable To Reset', 'Deformation'],
+                'causes': ['No Power', 'Overloaded', 'Loose Connections'],
+                'remedies': ['Check Incoming Feeder', 'Check Load Side', 'Replace & tighten']
+            },
+            'civil_concepts': {
+                'keywords': ['door', 'lock', 'handle', 'key', 'entrance', 'carpentry', 'civil'],
+                'failure_classes': ['Civil Services'],
+                'problems': ['Doors', 'NOT WORKING'],
+                'causes': ['Lock Damage', 'Handle Damage'],
+                'remedies': ['Replace', 'REPAIR/FIX']
+            }
+        }
+        
+        # ADD: Concept similarity weights
+        self.concept_similarity_boost = 0.3  # Boost for matching concepts
         
         self.confidence_threshold = 0.7
         
@@ -230,6 +278,55 @@ class EnhancedHierarchicalClassifier:
         self.logger.info(f"Added feedback for: '{combined_text[:50]}...'")
         self.logger.info(f"Correct path: {correct_path}")
         self.logger.info(f"Total feedback entries: {len(self.feedback_data)}")
+
+    def _get_intelligent_fallback(self, level: str, parent_path: List[str], text: str) -> str:
+        """Enhanced fallback using semantic concept analysis"""
+        
+        # Get basic valid options
+        valid_options = self._get_valid_options(level, parent_path)
+        
+        if not valid_options:
+            return self._get_basic_fallback(level)
+        
+        # Analyze text for concept matches
+        text_lower = text.lower()
+        option_scores = {}
+        
+        for option in valid_options:
+            score = 0.0
+            
+            # Score based on concept matching
+            for concept_name, concept_data in self.concept_mappings.items():
+                # Check if text matches this concept domain
+                text_concept_score = sum(1 for keyword in concept_data['keywords'] 
+                                    if keyword in text_lower)
+                
+                if text_concept_score > 0:  # Text relates to this concept
+                    # Check if option is in this concept's vocabulary
+                    level_options = concept_data.get(f'{level}s', [])  # problems -> problems
+                    if level == 'failure_class':
+                        level_options = concept_data.get('failure_classes', [])
+                    elif level == 'cause':
+                        level_options = concept_data.get('causes', [])
+                    elif level == 'remedy':
+                        level_options = concept_data.get('remedies', [])
+                    
+                    if option in level_options:
+                        score += text_concept_score * self.concept_similarity_boost
+            
+            # Add frequency-based score (existing logic)
+            if self.path_frequencies:
+                for path, freq in self.path_frequencies.items():
+                    if self._path_matches(path, parent_path + [option], level):
+                        score += freq * 0.01  # Small frequency boost
+            
+            option_scores[option] = score
+        
+        # Return option with highest score, or first if all zeros
+        if max(option_scores.values()) > 0:
+            return max(option_scores.items(), key=lambda x: x[1])[0]
+        else:
+            return valid_options[0]
 
     def _calculate_similarity(self, text1: str, text2: str) -> float:
         """Calculate similarity percentage between two texts"""
@@ -282,8 +379,12 @@ class EnhancedHierarchicalClassifier:
                 total_boost = 0.0
                 matched_patterns = []
                 
-                for (stored_desc, stored_remark), path_weights in self.pattern_weights.items():
-                    if path_tuple in path_weights:
+                for composite_key, weight in self.pattern_weights.items():
+                    (pattern_key, stored_path) = composite_key
+                    stored_desc, stored_remark = pattern_key
+    
+    
+                    if stored_path == path_tuple:
                         # Check exact description match
                         if stored_desc == input_desc.lower().strip():
                             # Check remark similarity if both exist
@@ -298,7 +399,7 @@ class EnhancedHierarchicalClassifier:
                                 remark_match = False  # One empty, other not
                             
                             if remark_match:
-                                weight = path_weights[path_tuple]
+                                weight = weight [path_tuple]
                                 total_boost += weight
                                 matched_patterns.append((f"desc_exact:{stored_desc[:20]}...", weight))
                                 self.logger.info(f"✓ Exact match found - applying boost: {weight}")
@@ -871,8 +972,10 @@ class EnhancedHierarchicalClassifier:
         # Group patterns by path with restricted matching
         path_scores = {}
         # CHANGE: Handle the correct structure
-        for (pattern_key, path_key), weight in self.pattern_weights.items():
+        for composite_key, weight in self.pattern_weights.items():
+            (pattern_key, path_key) = composite_key
             stored_desc, stored_remark = pattern_key
+            
             # Check exact description match
             if stored_desc == input_desc.lower().strip():
                 # Check remark similarity
@@ -998,54 +1101,67 @@ class EnhancedHierarchicalClassifier:
                     result['overall_confidence'] *= confidence
                     
                 else:
-                    # Use enhanced fallback
                     result['fallback_used'] = True
-                    fallback_prediction = self._get_fallback_prediction(level, current_path)
+                    fallback_prediction = self._get_fallback_prediction(level, current_path, combined_text)
                     
                     result['predictions'][level] = fallback_prediction
-                    result['confidences'][level] = 0.6
-                    result['source'][level] = 'hybrid_fallback'
+                    result['confidences'][level] = 0.7  # INCREASE: from 0.6 to 0.7 for intelligent fallback
+                    result['source'][level] = 'intelligent_fallback'  # CHANGE: Update source name
                     current_path.append(fallback_prediction)
-                    result['overall_confidence'] *= 0.6
+                    result['overall_confidence'] *= 0.7  # Update multiplier
         
         result['complete_path'] = current_path
         return result
 
-    
+    def _rank_paths_with_concept_awareness(self, paths: List[Dict], text: str) -> List[Dict]:
+        """ADD: Rank paths considering concept coherence"""
+        
+        text_lower = text.lower()
+        
+        # Calculate concept coherence for each path
+        for path_result in paths:
+            path = path_result['path']
+            coherence_score = 0.0
+            
+            # Check if entire path makes conceptual sense
+            for concept_name, concept_data in self.concept_mappings.items():
+                # Count text matches to this concept
+                text_matches = sum(1 for keyword in concept_data['keywords'] 
+                                if keyword in text_lower)
+                
+                if text_matches > 0:
+                    # Count path elements in this concept
+                    path_matches = 0
+                    for level, level_key in [('failure_class', 'failure_classes'), 
+                                        ('problem', 'problems'), 
+                                        ('cause', 'causes'), 
+                                        ('remedy', 'remedies')]:
+                        level_idx = ['failure_class', 'problem', 'cause', 'remedy'].index(level)
+                        if level_idx < len(path):
+                            level_options = concept_data.get(level_key, [])
+                            if path[level_idx] in level_options:
+                                path_matches += 1
+                    
+                    # Coherence = text_relevance * path_consistency
+                    if len(concept_data['keywords']) > 0:
+                        concept_coherence = (text_matches / len(concept_data['keywords'])) * (path_matches / 4)
+                        coherence_score = max(coherence_score, concept_coherence)
+            
+            # Apply coherence boost
+            path_result['concept_coherence'] = coherence_score
+            path_result['overall_confidence'] = min(1.0, 
+                path_result['overall_confidence'] + coherence_score * 0.2)
+        
+        # Re-sort by updated confidence
+        paths.sort(key=lambda x: x['overall_confidence'], reverse=True)
+        return paths
     def predict_with_confidence(self, description: str, remark: str = "") -> Dict:
         """Predict complete path with confidence scores using combined text"""
         ### CHANGE 1: Use enhanced prediction method that applies feedback ###
         return self.predict_with_confidence_enhanced(description, remark)
-    def _get_fallback_prediction(self, level: str, parent_path: List[str]) -> str:
-        """Enhanced fallback with frequency-based selection and full hierarchy support"""
-        # Get valid options using hybrid approach
-        valid_options = self._get_valid_options(level, parent_path)
-        
-        if valid_options:
-            # If we have frequency data, use most common from training
-            if self.path_frequencies and len(parent_path) >= 1:
-                frequencies = {}
-                for option in valid_options:
-                    count = 0
-                    for path, freq in self.path_frequencies.items():
-                        if self._path_matches(path, parent_path + [option], level):
-                            count += freq
-                    frequencies[option] = count
-                
-                if frequencies and max(frequencies.values()) > 0:
-                    return max(frequencies.items(), key=lambda x: x[1])[0]
-            
-            # Otherwise return first valid option
-            return valid_options[0]
-        
-        # Final fallback to defaults
-        fallback_map = {
-            'failure_class': 'Civil Services',
-            'problem': 'NOT WORKING',
-            'cause': 'UNKNOWN',
-            'remedy': 'REPAIR/FIX'
-        }
-        return fallback_map.get(level, 'UNKNOWN')
+    def _get_fallback_prediction(self, level: str, parent_path: List[str], text: str = "") -> str:
+        """REPLACE: Enhanced fallback with semantic intelligence"""
+        return self._get_intelligent_fallback(level, parent_path, text)
     
     def _path_matches(self, full_path: tuple, partial_path: list, level: str) -> bool:
         """Check if a full path matches partial path up to given level"""
@@ -1130,10 +1246,9 @@ class EnhancedHierarchicalClassifier:
         model_paths = self._get_model_predicted_paths(combined_text, top_k)
         
         # CHANGE: Combine and rank all paths
-        all_paths = self._combine_and_rank_paths(feedback_paths, model_paths, top_k)
+        all_paths = self._rank_paths_with_concept_awareness(all_paths, combined_text)
         
         result['top_paths'] = all_paths[:top_k]
-        
         return result
     def _predict_complete_path_from_fc(self, combined_text: str, failure_class: str, fc_confidence: float) -> Dict:
         """Predict complete path starting from a given failure class"""
@@ -1207,3 +1322,26 @@ class EnhancedHierarchicalClassifier:
                 debug_info['potential_paths'][path] += weight
         
         return debug_info
+
+
+    def get_feedback_stats(self) -> Dict:
+        """Get statistics about stored feedback"""
+        if not self.feedback_data:
+            return {"feedback_count": 0, "patterns": 0}
+        
+        pattern_count = len(self.pattern_weights)
+        recent_feedback = self.feedback_data[-5:] if len(self.feedback_data) >= 5 else self.feedback_data
+        
+        return {
+            "feedback_count": len(self.feedback_data),
+            "pattern_weights": pattern_count,
+            "recent_feedback": [
+                {
+                    "text": fb["text"][:50] + "..." if len(fb["text"]) > 50 else fb["text"],
+                    "path": fb["correct_path"],
+                    "timestamp": fb["timestamp"]
+                }
+                for fb in recent_feedback
+            ],
+            "sample_patterns": list(self.pattern_weights.keys())[:10]  # Show first 10 patterns
+        }
