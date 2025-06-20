@@ -1320,53 +1320,9 @@ class EnhancedHierarchicalClassifier:
         
         return True
     
-    def get_hierarchy_statistics(self) -> Dict:
-        """Get statistics about the hierarchies - FIXED VERSION"""
-        stats = {}
+
         
-        # Training hierarchy stats
-        if self.training_hierarchy:
-            total_paths = len(self.path_frequencies)  # FIXED: removed sum()
-            avg_frequency = sum(self.path_frequencies.values()) / len(self.path_frequencies) if self.path_frequencies else 0
-            
-            stats['training_hierarchy'] = {
-                'failure_classes': len(self.training_hierarchy),
-                'total_paths': total_paths,
-                'avg_frequency': avg_frequency
-            }
-        
-        # Full hierarchy stats
-        if self.full_hierarchy:
-            total_paths = 0
-            for fc in self.full_hierarchy:
-                for prob in self.full_hierarchy[fc]:
-                    for cause in self.full_hierarchy[fc][prob]:
-                        total_paths += len(self.full_hierarchy[fc][prob][cause])
-            
-            stats['full_hierarchy'] = {
-                'failure_classes': len(self.full_hierarchy),
-                'total_paths': total_paths
-            }
-        
-        return stats
-        
-    def save_model(self, filepath: str):
-        """Save enhanced model"""
-        model_data = {
-            'models': self.models,
-            'label_encoders': self.label_encoders,
-            'feature_engineer': self.feature_engineer,
-            'training_hierarchy': self.training_hierarchy,
-            'full_hierarchy': self.full_hierarchy,
-            'path_frequencies': self.path_frequencies,
-            'confidence_threshold': self.confidence_threshold,
-            'use_ensemble': self.use_ensemble
-        }
-        
-        with open(filepath, 'wb') as f:
-            pickle.dump(model_data, f)
-        
-        self.logger.info(f"Enhanced model saved to {filepath}")
+
     def predict_multiple_paths(self, description: str, remark: str = "", top_k: int = 3) -> Dict:
         """Predict multiple possible paths with feedback integration"""
         combined_text = f"{description} | {remark}".strip()
@@ -1437,32 +1393,7 @@ class EnhancedHierarchicalClassifier:
             'sources': dict(zip(['failure_class', 'problem', 'cause', 'remedy'], sources))
         }
     # Add this method to help debug pattern matching
-    def debug_pattern_matching(self, text: str) -> Dict:
-        """Debug method to show pattern matching details"""
-        text_lower = text.lower().strip()
-        
-        debug_info = {
-            'input_text': text,
-            'processed_text': text_lower,
-            'total_patterns': len(self.pattern_weights),
-            'matching_patterns': [],
-            'potential_paths': {}
-        }
-        
-        # Find all matching patterns
-        for (pattern, path), weight in self.pattern_weights.items():
-            if pattern.lower() in text_lower:
-                debug_info['matching_patterns'].append({
-                    'pattern': pattern,
-                    'path': path,
-                    'weight': weight
-                })
-                
-                if path not in debug_info['potential_paths']:
-                    debug_info['potential_paths'][path] = 0.0
-                debug_info['potential_paths'][path] += weight
-        
-        return debug_info
+
     
     def _analyze_concept_patterns(self, df: pd.DataFrame):
         """Analyze patterns in training data to enhance concept relationships"""
