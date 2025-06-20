@@ -1,194 +1,3 @@
-class DataAugmenter:
-    """Augment training data to address sparsity issues"""
-    
-    def __init__(self):
-        self.synonyms = {
-            'broken': ['damaged', 'faulty', 'defective', 'malfunctioning'],
-            'repair': ['fix', 'restore', 'mend', 'replace'],
-            'not working': ['not functioning', 'inoperative', 'out of order', 'failed'],
-            'leakage': ['leak', 'seepage', 'dripping', 'water escape'],
-            'connection': ['joint', 'fitting', 'coupling', 'link'],
-            'system': ['equipment', 'unit', 'device', 'apparatus'],
-            'door': ['entrance', 'doorway', 'portal', 'access'],
-            'lock': ['latch', 'fastener', 'security', 'mechanism'],
-            'handle': ['grip', 'knob', 'lever', 'control']
-        }
-    
-    def paraphrase_text(self, text: str, num_variations: int = 2) -> List[str]:
-        """Generate paraphrased versions of text"""
-        variations = [text]  # Original text
-        
-        for _ in range(num_variations):
-            new_text = text.lower()
-            
-            # Replace with synonyms
-            for word, syns in self.synonyms.items():
-                if word in new_text:
-                    new_text = new_text.replace(word, np.random.choice(syns))
-            
-            # Minor variations
-            new_text = re.sub(r'\b(the|a|an)\b', '', new_text)  # Remove articles
-            new_text = re.sub(r'\s+', ' ', new_text).strip()  # Clean spaces
-            
-            if new_text != text.lower() and new_text not in variations:
-                variations.append(new_text)
-        
-        return variations
-    
-    def augment_dataset(self, df: pd.DataFrame, min_samples_per_path: int = 50) -> pd.DataFrame:
-        """Augment dataset for underrepresented paths"""
-        # Ensure combined_text column exists
-        if 'combined_text' not in df.columns:
-            raise ValueError("DataFrame must have 'combined_text' column. Call prepare_combined_text() first.")
-        
-        # Count samples per complete path
-        path_counts = df.groupby(['failure_class', 'problem', 'cause', 'remedy']).size()
-        
-        augmented_rows = []
-        
-        for path, count in path_counts.items():
-            if count < min_samples_per_path:
-                # Get original rows for this path
-                mask = ((df['failure_class'] == path[0]) & 
-                       (df['problem'] == path[1]) & 
-                       (df['cause'] == path[2]) & 
-                       (df['remedy'] == path[3]))
-                
-                original_rows = df[mask]
-                
-                # Generate additional samples
-                needed = min_samples_per_path - count
-                
-                for _, row in original_rows.iterrows():
-                    # Generate variations of combined text (description + remark)
-                    combined_text = row['combined_text']
-                    text_variations = self.paraphrase_text(combined_text, 
-                                                         needed // len(original_rows) + 1)
-                    
-                    for i, new_text in enumerate(text_variations[1:]):  # Skip original
-                        if len(augmented_rows) >= needed:
-                            break
-                        
-                        new_row = row.copy()
-                        new_row['combined_text'] = new_text
-                        new_row['work_order_id'] = f"{row['work_order_id']}_aug_{i}"
-                        augmented_rows.append(new_row)
-        
-        if augmented_rows:
-            augmented_df = pd.DataFrame(augmented_rows)
-            return pd.concat([df, augmented_df], ignore_index=True)
-        
-        return df
-
-class FeatureEngineer:
-    """Enhanced feature engineering for Maximo data with combined text"""
-    
-    def __init__(self):
-        self.vectorizers = {}
-        self.domain_keywords = [
-            'electrical', 'plumbing', 'hvac', 'lighting', 'mechanical',
-            'leak', 'broken', 'repair', 'replace', 'fix', 'damage',
-            'connection', 'system', 'equipment', 'maintenance',
-            'door', 'lock', 'handle', 'key', 'closure', 'sliding',
-            'carpentry', 'civil services', 'issue', 'found', 'reported',
-            'building', 'apartment', 'unit', 'floor', 'main'
-        ]
-    
-    def extract_features(self, texts: List[str], fit: bool = True) -> np.ndarray:
-        """Extract comprehensive features from combined text"""
-        
-        # TF-IDF with domain-specific terms - enhanced for maintenance context
-        if fit or 'tfidf' not in self.vectorizers:
-            self.vectorizers['tfidf'] = TfidfVectorizer(
-                max_features=1500,  # Increased for richer text
-                ngram_range=(1, 3),
-                stop_words='english',
-                min_df=2,
-                max_df=0.8,
-                lowercase=True,
-                strip_accents='ascii'
-            )
-            tfidf_features = self.vectorizers['tfidf'].fit_transform(texts)
-        else:
-            tfidf_features = self.vectorizers['tfidf'].transform(texts)
-        
-        # Domain keyword features
-        keyword_features = []
-        for text in texts:
-            text_lower = text.lower()
-            features = [1 if keyword in text_lower else 0 for keyword in self.domain_keywords]
-            keyword_features.append(features)
-        
-        keyword_features = np.array(keyword_features)
-        
-        # Text length and pattern features
-        text_features = []
-        for text in texts:
-            features = [
-                len(text),  # Text length
-                len(text.split()),  # Word count
-                text.count('|'),  # Separator count (if combining desc + remark)
-                1 if any(char.isdigit() for char in text) else 0,  # Contains numbers
-                1 if re.search(r'\b(urgent|emergency|asap)\b', text.lower()) else 0,  # Urgency
-            ]
-            text_features.append(features)
-        
-        text_features = np.array(text_features)
-        
-        # FIXED: Ensure all arrays have the same number of rows (samples)
-        n_samples = len(texts)
-        
-        # Convert TF-IDF to dense array
-        tfidf_dense = tfidf_features.toarray()
-        
-        # Ensure keyword_features and text_features have correct shape
-        if keyword_features.shape[0] != n_samples:
-            print(f"Warning: keyword_features shape mismatch. Expected {n_samples}, got {keyword_features.shape[0]}")
-            keyword_features = keyword_features[:n_samples] if keyword_features.shape[0] > n_samples else keyword_features
-        
-        if text_features.shape[0] != n_samples:
-            print(f"Warning: text_features shape mismatch. Expected {n_samples}, got {text_features.shape[0]}")
-            text_features = text_features[:n_samples] if text_features.shape[0] > n_samples else text_features
-        
-        # Debug: Print shapes before concatenation
-        print(f"Feature shapes - TF-IDF: {tfidf_dense.shape}, Keywords: {keyword_features.shape}, Text: {text_features.shape}")
-        
-        # Combine all features - FIXED: Only include the defined features
-        combined_features = np.hstack([
-            tfidf_dense, 
-            keyword_features,
-            text_features
-        ])
-        
-        print(f"Combined features shape: {combined_features.shape}")
-        
-        return combined_features
-def prepare_combined_text(df: pd.DataFrame, desc_col: str = 'description', remark_col: str = 'remark') -> pd.DataFrame:
-    """Prepare combined text from description and remark columns"""
-    df = df.copy()
-    
-    # Handle missing values
-    df[desc_col] = df[desc_col].fillna('').astype(str)
-    df[remark_col] = df[remark_col].fillna('').astype(str)
-    
-    # Combine description and remark with separator
-    # Use ' | ' as separator to help model distinguish between the two parts
-    df['combined_text'] = df[desc_col] + ' | ' + df[remark_col]
-    
-    # Clean up the combined text
-    df['combined_text'] = df['combined_text'].str.replace(r'\s+', ' ', regex=True)  # Multiple spaces
-    df['combined_text'] = df['combined_text'].str.replace(' | ', ' | ', regex=False)  # Clean separator
-    df['combined_text'] = df['combined_text'].str.strip()  # Trim whitespace
-    
-    # Remove cases where combined text is just the separator
-    df['combined_text'] = df['combined_text'].replace('|', '').str.strip()
-    df['combined_text'] = df['combined_text'].replace('', 'No description available')
-    
-    print(f"✅ Combined text prepared. Average length: {df['combined_text'].str.len().mean():.1f} characters")
-    print(f"Sample combined text: '{df['combined_text'].iloc[0][:100]}...'")
-    
-    return df
-
 class EnhancedHierarchicalClassifier:
     """Enhanced hierarchical classifier with combined text support"""
     
@@ -206,29 +15,30 @@ class EnhancedHierarchicalClassifier:
         self.path_frequencies = {}   # Track frequency of paths in training
 
         self.concept_mappings = {
-            'plumbing_concepts': {
-                'keywords': ['water', 'heater', 'pipe', 'leak', 'plumbing', 'supply', 'drain', 
-                           'faucet', 'toilet', 'shower', 'hot water', 'cold water', 'pressure'],
-                'failure_classes': ['PLUMBING', 'Pipe', 'Water Supply'],
-                'problems': ['Water heater not working', 'Leakage', 'Water Leak', 'No Hot Water'],
-                'causes': ['Water heater defected', 'Leakage In System', 'Pipe Damage'],
-                'remedies': ['Replace', 'Repair/Replace', 'Fix Leak']
-            },
-            'electrical_concepts': {
-                'keywords': ['power', 'electrical', 'circuit', 'breaker', 'wiring', 'voltage',
-                           'switch', 'outlet', 'lighting', 'heater'],
-                'failure_classes': ['CIRCUIT BREAKER', 'Heater', 'Lighting Systems'],
-                'problems': ['Not Working', 'Unable To Reset', 'Deformation'],
-                'causes': ['No Power', 'Overloaded', 'Loose Connections'],
-                'remedies': ['Check Incoming Feeder', 'Check Load Side', 'Replace & tighten']
-            },
-            'civil_concepts': {
-                'keywords': ['door', 'lock', 'handle', 'key', 'entrance', 'carpentry', 'civil'],
-                'failure_classes': ['Civil Services'],
-                'problems': ['Doors', 'NOT WORKING'],
-                'causes': ['Lock Damage', 'Handle Damage'],
-                'remedies': ['Replace', 'REPAIR/FIX']
-            }
+        'plumbing_concepts': {
+            'keywords': ['water', 'heater', 'pipe', 'leak', 'plumbing', 'supply', 'drain', 
+                        'faucet', 'toilet', 'shower', 'hot water', 'cold water', 'pressure'],
+            'failure_classes': ['PLUMBING', 'Pipe', 'Water Supply', 'Water Heater'],  # ADD Water Heater
+            'related_concepts': ['electrical_heating', 'water_systems'],  # ADD relationships
+            'problems': ['Water heater not working', 'Leakage', 'Water Leak', 'No Hot Water'],
+            'causes': ['Water heater defected', 'Leakage In System', 'Pipe Damage'],
+            'remedies': ['Replace', 'Repair/Replace', 'Fix Leak']
+        },
+        'electrical_concepts': {
+            'keywords': ['power', 'electrical', 'circuit', 'breaker', 'wiring', 'voltage',
+                        'switch', 'outlet', 'lighting', 'heater'],
+            'failure_classes': ['CIRCUIT BREAKER', 'Heater', 'Lighting Systems', 'LGTSYS'],
+            'related_concepts': ['plumbing_concepts'],  # ADD: electrical heaters relate to plumbing
+            'problems': ['Not Working', 'Unable To Reset', 'Deformation'],
+            'causes': ['No Power', 'Overloaded', 'Loose Connections'],
+            'remedies': ['Check Incoming Feeder', 'Check Load Side', 'Replace & tighten']
+        },
+        # ADD: New water systems concept
+        'water_systems': {
+            'keywords': ['water', 'heating', 'temperature', 'hot', 'cold'],
+            'failure_classes': ['Water Heater', 'PLUMBING', 'Heater'],
+            'related_concepts': ['plumbing_concepts', 'electrical_concepts']
+        }
         }
         
         # ADD: Concept similarity weights
@@ -280,53 +90,131 @@ class EnhancedHierarchicalClassifier:
         self.logger.info(f"Total feedback entries: {len(self.feedback_data)}")
 
     def _get_intelligent_fallback(self, level: str, parent_path: List[str], text: str) -> str:
-        """Enhanced fallback using semantic concept analysis"""
+        """Enhanced fallback with path similarity and concept relationships"""
         
-        # Get basic valid options
+        # STEP 1: Try to find similar paths with same failure_class + problem
+        if level in ['cause', 'remedy'] and len(parent_path) >= 2:
+            similar_paths = self._find_similar_paths_same_fc_problem(parent_path[:2])
+            if similar_paths:
+                # Score by text relevance
+                best_option = self._score_options_by_text_relevance(
+                    similar_paths, level, text, parent_path
+                )
+                if best_option:
+                    return best_option
+        
+        # STEP 2: Try related concepts fallback
+        related_options = self._get_related_concept_options(level, parent_path, text)
+        if related_options:
+            return self._score_options_by_text_relevance(
+                related_options, level, text, parent_path
+            )
+        
+        # STEP 3: Original logic as final fallback
         valid_options = self._get_valid_options(level, parent_path)
+        if valid_options:
+            return self._score_options_by_frequency(valid_options, parent_path)
         
-        if not valid_options:
-            return self._get_basic_fallback(level)
+        return self._get_basic_fallback(level)
+    def _get_related_concept_options(self, level: str, parent_path: List[str], text: str) -> List[str]:
+        """Get options from related concepts"""
+        if not parent_path:
+            return []
         
-        # Analyze text for concept matches
+        current_fc = parent_path[0]
+        related_options = []
+        
+        # Find which concept the current failure_class belongs to
+        current_concept = None
+        for concept_name, concept_data in self.concept_mappings.items():
+            if current_fc in concept_data.get('failure_classes', []):
+                current_concept = concept_name
+                break
+        
+        if not current_concept:
+            return []
+        
+        # Get related concepts
+        related_concepts = self.concept_mappings[current_concept].get('related_concepts', [])
+        
+        for related_name in related_concepts:
+            if related_name in self.concept_mappings:
+                related_data = self.concept_mappings[related_name]
+                
+                # Check if text matches this related concept
+                text_lower = text.lower()
+                matches = sum(1 for keyword in related_data['keywords'] if keyword in text_lower)
+                
+                if matches > 0:  # Text is relevant to this related concept
+                    level_key = f'{level}s' if level != 'failure_class' else 'failure_classes'
+                    if level == 'cause':
+                        level_key = 'causes'
+                    elif level == 'remedy':
+                        level_key = 'remedies'
+                    
+                    related_options.extend(related_data.get(level_key, []))
+        
+        return list(set(related_options))
+    def _score_options_by_text_relevance(self, options: List[str], level: str, text: str, parent_path: List[str]) -> str:
+        """Score options based on text relevance and return best match"""
+        if not options:
+            return None
+        
         text_lower = text.lower()
         option_scores = {}
         
-        for option in valid_options:
+        for option in options:
             score = 0.0
+            option_lower = option.lower()
             
-            # Score based on concept matching
+            # Direct keyword matching
+            if option_lower in text_lower:
+                score += 1.0
+            
+            # Partial matching
+            option_words = option_lower.split()
+            for word in option_words:
+                if word in text_lower:
+                    score += 0.5
+            
+            # Concept coherence scoring
             for concept_name, concept_data in self.concept_mappings.items():
-                # Check if text matches this concept domain
-                text_concept_score = sum(1 for keyword in concept_data['keywords'] 
-                                    if keyword in text_lower)
-                
-                if text_concept_score > 0:  # Text relates to this concept
-                    # Check if option is in this concept's vocabulary
-                    level_options = concept_data.get(f'{level}s', [])  # problems -> problems
-                    if level == 'failure_class':
-                        level_options = concept_data.get('failure_classes', [])
-                    elif level == 'cause':
-                        level_options = concept_data.get('causes', [])
-                    elif level == 'remedy':
-                        level_options = concept_data.get('remedies', [])
-                    
-                    if option in level_options:
-                        score += text_concept_score * self.concept_similarity_boost
+                if option in concept_data.get(f'{level}s', concept_data.get('failure_classes', [])):
+                    # Count text matches to this concept
+                    concept_matches = sum(1 for keyword in concept_data['keywords'] if keyword in text_lower)
+                    if concept_matches > 0:
+                        score += concept_matches * 0.3
             
-            # Add frequency-based score (existing logic)
-            if self.path_frequencies:
-                for path, freq in self.path_frequencies.items():
-                    if self._path_matches(path, parent_path + [option], level):
-                        score += freq * 0.01  # Small frequency boost
+            # Frequency boost from training data
+            for path, freq in self.path_frequencies.items():
+                if option in path:
+                    score += min(freq * 0.01, 0.2)  # Cap frequency boost
             
             option_scores[option] = score
         
-        # Return option with highest score, or first if all zeros
-        if max(option_scores.values()) > 0:
-            return max(option_scores.items(), key=lambda x: x[1])[0]
-        else:
-            return valid_options[0]
+        # Return option with highest score
+        return max(option_scores.items(), key=lambda x: x[1])[0]
+    
+    def _find_similar_paths_same_fc_problem(self, fc_problem_path: List[str]) -> List[str]:
+        """Find all paths that share the same failure_class and problem"""
+        if len(fc_problem_path) < 2:
+            return []
+        
+        fc, problem = fc_problem_path[0], fc_problem_path[1]
+        similar_options = []
+        
+        # Search in training hierarchy
+        for path, freq in self.path_frequencies.items():
+            if len(path) >= 2 and path[0] == fc and path[1] == problem:
+                similar_options.extend(path[2:])  # Add causes and remedies
+        
+        # Search in full hierarchy
+        if fc in self.full_hierarchy and problem in self.full_hierarchy[fc]:
+            for cause in self.full_hierarchy[fc][problem]:
+                similar_options.append(cause)
+                similar_options.extend(self.full_hierarchy[fc][problem][cause])
+        
+        return list(set(similar_options))
 
     def _calculate_similarity(self, text1: str, text2: str) -> float:
         """Calculate similarity percentage between two texts"""
@@ -938,11 +826,10 @@ class EnhancedHierarchicalClassifier:
         return feedback_paths[:top_k]
     
     def _get_model_predicted_paths(self, combined_text: str, top_k: int) -> List[Dict]:
-        """Get paths from model predictions (existing logic)"""
+        """Enhanced model prediction with concept awareness"""
         model_paths = []
-        levels = ['failure_class', 'problem', 'cause', 'remedy']
         
-        # Get top-k predictions for failure_class (existing logic)
+        # Original model predictions
         features = self.feature_engineer.extract_features([combined_text], fit=False)
         
         if 'failure_class' in self.models:
@@ -958,10 +845,14 @@ class EnhancedHierarchicalClassifier:
                 
                 path_result = self._predict_complete_path_from_fc(combined_text, fc, confidence)
                 path_result['source'] = 'model_prediction'
-                path_result['feedback_boost'] = 0.0
                 model_paths.append(path_result)
         
-        return model_paths
+        # ADD: Include related concept paths if confidence is low
+        if model_paths and model_paths[0]['overall_confidence'] < 0.6:
+            concept_paths = self._get_concept_aware_paths(combined_text, top_k // 2)
+            model_paths.extend(concept_paths)
+        
+        return model_paths[:top_k]
     
 
     def _get_feedback_influenced_paths(self, text: str, top_k: int) -> List[Dict]:
@@ -1039,6 +930,35 @@ class EnhancedHierarchicalClassifier:
         all_paths.sort(key=lambda x: x['overall_confidence'], reverse=True)
         
         return all_paths
+    def _get_concept_aware_paths(self, text: str, max_paths: int) -> List[Dict]:
+        """Generate paths based on concept analysis"""
+        text_lower = text.lower()
+        concept_paths = []
+        
+        # Analyze which concepts the text relates to
+        concept_scores = {}
+        for concept_name, concept_data in self.concept_mappings.items():
+            score = sum(1 for keyword in concept_data['keywords'] if keyword in text_lower)
+            if score > 0:
+                concept_scores[concept_name] = score
+        
+        # Generate paths from top concepts
+        for concept_name in sorted(concept_scores.keys(), key=lambda x: concept_scores[x], reverse=True):
+            if len(concept_paths) >= max_paths:
+                break
+                
+            concept_data = self.concept_mappings[concept_name]
+            
+            # Try to build a coherent path from this concept
+            for fc in concept_data.get('failure_classes', []):
+                if fc in self.training_hierarchy or fc in self.full_hierarchy:
+                    path_result = self._build_concept_coherent_path(text, fc, concept_data)
+                    if path_result:
+                        concept_paths.append(path_result)
+                        if len(concept_paths) >= max_paths:
+                            break
+        
+        return concept_paths
     
     def _predict_with_combined_text(self, combined_text: str) -> Dict:
         """Internal method to predict with combined text"""
@@ -1210,6 +1130,23 @@ class EnhancedHierarchicalClassifier:
         
         return stats
         
+    def save_model(self, filepath: str):
+        """Save enhanced model"""
+        model_data = {
+            'models': self.models,
+            'label_encoders': self.label_encoders,
+            'feature_engineer': self.feature_engineer,
+            'training_hierarchy': self.training_hierarchy,
+            'full_hierarchy': self.full_hierarchy,
+            'path_frequencies': self.path_frequencies,
+            'confidence_threshold': self.confidence_threshold,
+            'use_ensemble': self.use_ensemble
+        }
+        
+        with open(filepath, 'wb') as f:
+            pickle.dump(model_data, f)
+        
+        self.logger.info(f"Enhanced model saved to {filepath}")
     def predict_multiple_paths(self, description: str, remark: str = "", top_k: int = 3) -> Dict:
         """Predict multiple possible paths with feedback integration"""
         combined_text = f"{description} | {remark}".strip()
@@ -1280,9 +1217,78 @@ class EnhancedHierarchicalClassifier:
             'sources': dict(zip(['failure_class', 'problem', 'cause', 'remedy'], sources))
         }
     # Add this method to help debug pattern matching
+    def debug_pattern_matching(self, text: str) -> Dict:
+        """Debug method to show pattern matching details"""
+        text_lower = text.lower().strip()
+        
+        debug_info = {
+            'input_text': text,
+            'processed_text': text_lower,
+            'total_patterns': len(self.pattern_weights),
+            'matching_patterns': [],
+            'potential_paths': {}
+        }
+        
+        # Find all matching patterns
+        for (pattern, path), weight in self.pattern_weights.items():
+            if pattern.lower() in text_lower:
+                debug_info['matching_patterns'].append({
+                    'pattern': pattern,
+                    'path': path,
+                    'weight': weight
+                })
+                
+                if path not in debug_info['potential_paths']:
+                    debug_info['potential_paths'][path] = 0.0
+                debug_info['potential_paths'][path] += weight
+        
+        return debug_info
+    
+    def _analyze_concept_patterns(self, df: pd.DataFrame):
+        """Analyze patterns in training data to enhance concept relationships"""
+        
+        # Build co-occurrence matrix for failure classes
+        fc_cooccurrence = {}
+        
+        for _, row in df.iterrows():
+            text = row['combined_text'].lower()
+            fc = row['failure_class']
+            
+            # Find which concepts this text and FC relate to
+            for concept_name, concept_data in self.concept_mappings.items():
+                text_matches = sum(1 for keyword in concept_data['keywords'] if keyword in text)
+                
+                if text_matches > 0 and fc in concept_data.get('failure_classes', []):
+                    # This confirms the concept relationship
+                    if concept_name not in fc_cooccurrence:
+                        fc_cooccurrence[concept_name] = {}
+                    fc_cooccurrence[concept_name][fc] = fc_cooccurrence[concept_name].get(fc, 0) + 1
+        
+        # Store for use in fallback
+        self.concept_fc_patterns = fc_cooccurrence
 
 
-
+    def get_feedback_stats(self) -> Dict:
+        """Get statistics about stored feedback"""
+        if not self.feedback_data:
+            return {"feedback_count": 0, "patterns": 0}
+        
+        pattern_count = len(self.pattern_weights)
+        recent_feedback = self.feedback_data[-5:] if len(self.feedback_data) >= 5 else self.feedback_data
+        
+        return {
+            "feedback_count": len(self.feedback_data),
+            "pattern_weights": pattern_count,
+            "recent_feedback": [
+                {
+                    "text": fb["text"][:50] + "..." if len(fb["text"]) > 50 else fb["text"],
+                    "path": fb["correct_path"],
+                    "timestamp": fb["timestamp"]
+                }
+                for fb in recent_feedback
+            ],
+            "sample_patterns": list(self.pattern_weights.keys())[:10]  # Show first 10 patterns
+        }
 
     def load_model(self, filepath: str):
         """Load enhanced model"""
