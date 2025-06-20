@@ -1,3 +1,194 @@
+class DataAugmenter:
+    """Augment training data to address sparsity issues"""
+    
+    def __init__(self):
+        self.synonyms = {
+            'broken': ['damaged', 'faulty', 'defective', 'malfunctioning'],
+            'repair': ['fix', 'restore', 'mend', 'replace'],
+            'not working': ['not functioning', 'inoperative', 'out of order', 'failed'],
+            'leakage': ['leak', 'seepage', 'dripping', 'water escape'],
+            'connection': ['joint', 'fitting', 'coupling', 'link'],
+            'system': ['equipment', 'unit', 'device', 'apparatus'],
+            'door': ['entrance', 'doorway', 'portal', 'access'],
+            'lock': ['latch', 'fastener', 'security', 'mechanism'],
+            'handle': ['grip', 'knob', 'lever', 'control']
+        }
+    
+    def paraphrase_text(self, text: str, num_variations: int = 2) -> List[str]:
+        """Generate paraphrased versions of text"""
+        variations = [text]  # Original text
+        
+        for _ in range(num_variations):
+            new_text = text.lower()
+            
+            # Replace with synonyms
+            for word, syns in self.synonyms.items():
+                if word in new_text:
+                    new_text = new_text.replace(word, np.random.choice(syns))
+            
+            # Minor variations
+            new_text = re.sub(r'\b(the|a|an)\b', '', new_text)  # Remove articles
+            new_text = re.sub(r'\s+', ' ', new_text).strip()  # Clean spaces
+            
+            if new_text != text.lower() and new_text not in variations:
+                variations.append(new_text)
+        
+        return variations
+    
+    def augment_dataset(self, df: pd.DataFrame, min_samples_per_path: int = 50) -> pd.DataFrame:
+        """Augment dataset for underrepresented paths"""
+        # Ensure combined_text column exists
+        if 'combined_text' not in df.columns:
+            raise ValueError("DataFrame must have 'combined_text' column. Call prepare_combined_text() first.")
+        
+        # Count samples per complete path
+        path_counts = df.groupby(['failure_class', 'problem', 'cause', 'remedy']).size()
+        
+        augmented_rows = []
+        
+        for path, count in path_counts.items():
+            if count < min_samples_per_path:
+                # Get original rows for this path
+                mask = ((df['failure_class'] == path[0]) & 
+                       (df['problem'] == path[1]) & 
+                       (df['cause'] == path[2]) & 
+                       (df['remedy'] == path[3]))
+                
+                original_rows = df[mask]
+                
+                # Generate additional samples
+                needed = min_samples_per_path - count
+                
+                for _, row in original_rows.iterrows():
+                    # Generate variations of combined text (description + remark)
+                    combined_text = row['combined_text']
+                    text_variations = self.paraphrase_text(combined_text, 
+                                                         needed // len(original_rows) + 1)
+                    
+                    for i, new_text in enumerate(text_variations[1:]):  # Skip original
+                        if len(augmented_rows) >= needed:
+                            break
+                        
+                        new_row = row.copy()
+                        new_row['combined_text'] = new_text
+                        new_row['work_order_id'] = f"{row['work_order_id']}_aug_{i}"
+                        augmented_rows.append(new_row)
+        
+        if augmented_rows:
+            augmented_df = pd.DataFrame(augmented_rows)
+            return pd.concat([df, augmented_df], ignore_index=True)
+        
+        return df
+
+class FeatureEngineer:
+    """Enhanced feature engineering for Maximo data with combined text"""
+    
+    def __init__(self):
+        self.vectorizers = {}
+        self.domain_keywords = [
+            'electrical', 'plumbing', 'hvac', 'lighting', 'mechanical',
+            'leak', 'broken', 'repair', 'replace', 'fix', 'damage',
+            'connection', 'system', 'equipment', 'maintenance',
+            'door', 'lock', 'handle', 'key', 'closure', 'sliding',
+            'carpentry', 'civil services', 'issue', 'found', 'reported',
+            'building', 'apartment', 'unit', 'floor', 'main'
+        ]
+    
+    def extract_features(self, texts: List[str], fit: bool = True) -> np.ndarray:
+        """Extract comprehensive features from combined text"""
+        
+        # TF-IDF with domain-specific terms - enhanced for maintenance context
+        if fit or 'tfidf' not in self.vectorizers:
+            self.vectorizers['tfidf'] = TfidfVectorizer(
+                max_features=1500,  # Increased for richer text
+                ngram_range=(1, 3),
+                stop_words='english',
+                min_df=2,
+                max_df=0.8,
+                lowercase=True,
+                strip_accents='ascii'
+            )
+            tfidf_features = self.vectorizers['tfidf'].fit_transform(texts)
+        else:
+            tfidf_features = self.vectorizers['tfidf'].transform(texts)
+        
+        # Domain keyword features
+        keyword_features = []
+        for text in texts:
+            text_lower = text.lower()
+            features = [1 if keyword in text_lower else 0 for keyword in self.domain_keywords]
+            keyword_features.append(features)
+        
+        keyword_features = np.array(keyword_features)
+        
+        # Text length and pattern features
+        text_features = []
+        for text in texts:
+            features = [
+                len(text),  # Text length
+                len(text.split()),  # Word count
+                text.count('|'),  # Separator count (if combining desc + remark)
+                1 if any(char.isdigit() for char in text) else 0,  # Contains numbers
+                1 if re.search(r'\b(urgent|emergency|asap)\b', text.lower()) else 0,  # Urgency
+            ]
+            text_features.append(features)
+        
+        text_features = np.array(text_features)
+        
+        # FIXED: Ensure all arrays have the same number of rows (samples)
+        n_samples = len(texts)
+        
+        # Convert TF-IDF to dense array
+        tfidf_dense = tfidf_features.toarray()
+        
+        # Ensure keyword_features and text_features have correct shape
+        if keyword_features.shape[0] != n_samples:
+            print(f"Warning: keyword_features shape mismatch. Expected {n_samples}, got {keyword_features.shape[0]}")
+            keyword_features = keyword_features[:n_samples] if keyword_features.shape[0] > n_samples else keyword_features
+        
+        if text_features.shape[0] != n_samples:
+            print(f"Warning: text_features shape mismatch. Expected {n_samples}, got {text_features.shape[0]}")
+            text_features = text_features[:n_samples] if text_features.shape[0] > n_samples else text_features
+        
+        # Debug: Print shapes before concatenation
+        print(f"Feature shapes - TF-IDF: {tfidf_dense.shape}, Keywords: {keyword_features.shape}, Text: {text_features.shape}")
+        
+        # Combine all features - FIXED: Only include the defined features
+        combined_features = np.hstack([
+            tfidf_dense, 
+            keyword_features,
+            text_features
+        ])
+        
+        print(f"Combined features shape: {combined_features.shape}")
+        
+        return combined_features
+def prepare_combined_text(df: pd.DataFrame, desc_col: str = 'description', remark_col: str = 'remark') -> pd.DataFrame:
+    """Prepare combined text from description and remark columns"""
+    df = df.copy()
+    
+    # Handle missing values
+    df[desc_col] = df[desc_col].fillna('').astype(str)
+    df[remark_col] = df[remark_col].fillna('').astype(str)
+    
+    # Combine description and remark with separator
+    # Use ' | ' as separator to help model distinguish between the two parts
+    df['combined_text'] = df[desc_col] + ' | ' + df[remark_col]
+    
+    # Clean up the combined text
+    df['combined_text'] = df['combined_text'].str.replace(r'\s+', ' ', regex=True)  # Multiple spaces
+    df['combined_text'] = df['combined_text'].str.replace(' | ', ' | ', regex=False)  # Clean separator
+    df['combined_text'] = df['combined_text'].str.strip()  # Trim whitespace
+    
+    # Remove cases where combined text is just the separator
+    df['combined_text'] = df['combined_text'].replace('|', '').str.strip()
+    df['combined_text'] = df['combined_text'].replace('', 'No description available')
+    
+    print(f"✅ Combined text prepared. Average length: {df['combined_text'].str.len().mean():.1f} characters")
+    print(f"Sample combined text: '{df['combined_text'].iloc[0][:100]}...'")
+    
+    return df
+
 class EnhancedHierarchicalClassifier:
     """Enhanced hierarchical classifier with combined text support"""
     
@@ -1054,7 +1245,8 @@ class EnhancedHierarchicalClassifier:
         # CHANGE: Get model-predicted paths
         model_paths = self._get_model_predicted_paths(combined_text, top_k)
         
-        # CHANGE: Combine and rank all paths
+        # CHANGE: Combine and rank all paths - FIX: Define all_paths first
+        all_paths = self._combine_and_rank_paths(feedback_paths, model_paths, top_k)
         all_paths = self._rank_paths_with_concept_awareness(all_paths, combined_text)
         
         result['top_paths'] = all_paths[:top_k]
@@ -1154,3 +1346,19 @@ class EnhancedHierarchicalClassifier:
             ],
             "sample_patterns": list(self.pattern_weights.keys())[:10]  # Show first 10 patterns
         }
+
+    def load_model(self, filepath: str):
+        """Load enhanced model"""
+        with open(filepath, 'rb') as f:
+            model_data = pickle.load(f)
+        
+        self.models = model_data['models']
+        self.label_encoders = model_data['label_encoders']
+        self.feature_engineer = model_data['feature_engineer']
+        self.training_hierarchy = model_data.get('training_hierarchy', {})
+        self.full_hierarchy = model_data.get('full_hierarchy', {})
+        self.path_frequencies = model_data.get('path_frequencies', {})
+        self.confidence_threshold = model_data['confidence_threshold']
+        self.use_ensemble = model_data.get('use_ensemble', True)
+        
+        self.logger.info(f"Enhanced model loaded from {filepath}")
