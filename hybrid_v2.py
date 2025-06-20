@@ -1210,23 +1210,6 @@ class EnhancedHierarchicalClassifier:
         
         return stats
         
-    def save_model(self, filepath: str):
-        """Save enhanced model"""
-        model_data = {
-            'models': self.models,
-            'label_encoders': self.label_encoders,
-            'feature_engineer': self.feature_engineer,
-            'training_hierarchy': self.training_hierarchy,
-            'full_hierarchy': self.full_hierarchy,
-            'path_frequencies': self.path_frequencies,
-            'confidence_threshold': self.confidence_threshold,
-            'use_ensemble': self.use_ensemble
-        }
-        
-        with open(filepath, 'wb') as f:
-            pickle.dump(model_data, f)
-        
-        self.logger.info(f"Enhanced model saved to {filepath}")
     def predict_multiple_paths(self, description: str, remark: str = "", top_k: int = 3) -> Dict:
         """Predict multiple possible paths with feedback integration"""
         combined_text = f"{description} | {remark}".strip()
@@ -1297,55 +1280,9 @@ class EnhancedHierarchicalClassifier:
             'sources': dict(zip(['failure_class', 'problem', 'cause', 'remedy'], sources))
         }
     # Add this method to help debug pattern matching
-    def debug_pattern_matching(self, text: str) -> Dict:
-        """Debug method to show pattern matching details"""
-        text_lower = text.lower().strip()
-        
-        debug_info = {
-            'input_text': text,
-            'processed_text': text_lower,
-            'total_patterns': len(self.pattern_weights),
-            'matching_patterns': [],
-            'potential_paths': {}
-        }
-        
-        # Find all matching patterns
-        for (pattern, path), weight in self.pattern_weights.items():
-            if pattern.lower() in text_lower:
-                debug_info['matching_patterns'].append({
-                    'pattern': pattern,
-                    'path': path,
-                    'weight': weight
-                })
-                
-                if path not in debug_info['potential_paths']:
-                    debug_info['potential_paths'][path] = 0.0
-                debug_info['potential_paths'][path] += weight
-        
-        return debug_info
 
 
-    def get_feedback_stats(self) -> Dict:
-        """Get statistics about stored feedback"""
-        if not self.feedback_data:
-            return {"feedback_count": 0, "patterns": 0}
-        
-        pattern_count = len(self.pattern_weights)
-        recent_feedback = self.feedback_data[-5:] if len(self.feedback_data) >= 5 else self.feedback_data
-        
-        return {
-            "feedback_count": len(self.feedback_data),
-            "pattern_weights": pattern_count,
-            "recent_feedback": [
-                {
-                    "text": fb["text"][:50] + "..." if len(fb["text"]) > 50 else fb["text"],
-                    "path": fb["correct_path"],
-                    "timestamp": fb["timestamp"]
-                }
-                for fb in recent_feedback
-            ],
-            "sample_patterns": list(self.pattern_weights.keys())[:10]  # Show first 10 patterns
-        }
+
 
     def load_model(self, filepath: str):
         """Load enhanced model"""
