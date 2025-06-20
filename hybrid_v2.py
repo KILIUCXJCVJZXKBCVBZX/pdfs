@@ -18,7 +18,7 @@ class EnhancedHierarchicalClassifier:
         'plumbing_concepts': {
             'keywords': ['water', 'heater', 'pipe', 'leak', 'plumbing', 'supply', 'drain', 
                         'faucet', 'toilet', 'shower', 'hot water', 'cold water', 'pressure'],
-            'failure_classes': ['PLUMBING', 'Pipe', 'Water Supply', 'Water Heater'],  # ADD Water Heater
+            'failure_classes': ['PLUMBING', 'Pipe', 'Water Supply', 'Water Heater','toilet'],  # ADD Water Heater
             'related_concepts': ['electrical_heating', 'water_systems'],  # ADD relationships
             'problems': ['Water heater not working', 'Leakage', 'Water Leak', 'No Hot Water'],
             'causes': ['Water heater defected', 'Leakage In System', 'Pipe Damage'],
@@ -326,7 +326,7 @@ class EnhancedHierarchicalClassifier:
         plumbing_patterns = [
             'water supply', 'water leak', 'water heater', 'plumbing system',
             'pipe', 'faucet', 'drain', 'toilet', 'shower', 'bath',
-            'hot water', 'cold water', 'pressure', 'flow'
+            'hot water', 'cold water', 'pressure', 'flow','toilet'
         ]
         
         electrical_patterns = [
@@ -854,6 +854,187 @@ class EnhancedHierarchicalClassifier:
         
         return model_paths[:top_k]
     
+    def _build_concept_coherent_path(self, text: str, failure_class: str, concept_data: dict) -> Dict:
+        """Build a coherent path from concept data and failure class"""
+        
+        # Initialize path with the given failure class
+        path = [failure_class]
+        confidences = {'failure_class': 0.8}  # Base confidence for concept-based FC
+        
+        # Text analysis for relevance scoring
+        text_lower = text.lower()
+        
+        # Step 1: Find the best problem for this concept and text
+        problems = concept_data.get('problems', [])
+        if problems:
+            # Score problems based on text relevance
+            problem_scores = {}
+            for problem in problems:
+                score = 0.0
+                problem_lower = problem.lower()
+                
+                # Direct text match
+                if problem_lower in text_lower:
+                    score += 1.0
+                
+                # Word overlap scoring
+                problem_words = problem_lower.split()
+                text_words = text_lower.split()
+                overlap = len(set(problem_words) & set(text_words))
+                if len(problem_words) > 0:
+                    score += overlap / len(problem_words) * 0.8
+                
+                # Concept keyword relevance
+                concept_keywords = concept_data.get('keywords', [])
+                keyword_matches = sum(1 for keyword in concept_keywords if keyword in problem_lower)
+                if len(concept_keywords) > 0:
+                    score += keyword_matches / len(concept_keywords) * 0.6
+                
+                problem_scores[problem] = score
+            
+            # Select best problem
+            best_problem = max(problem_scores, key=problem_scores.get)
+            path.append(best_problem)
+            confidences['problem'] = min(0.9, 0.5 + problem_scores[best_problem])
+        else:
+            # Fallback to hierarchy-based problem
+            hierarchy_problems = self._get_valid_options('problem', [failure_class])
+            if hierarchy_problems:
+                # Score hierarchy problems by text relevance
+                best_problem = self._score_options_by_text_relevance(
+                    hierarchy_problems, 'problem', text, [failure_class]
+                )
+                path.append(best_problem)
+                confidences['problem'] = 0.6
+            else:
+                path.append('GENERAL PROBLEM')
+                confidences['problem'] = 0.4
+        
+        # Step 2: Find the best cause for this concept and text
+        causes = concept_data.get('causes', [])
+        if causes:
+            # Score causes based on text relevance and concept coherence
+            cause_scores = {}
+            for cause in causes:
+                score = 0.0
+                cause_lower = cause.lower()
+                
+                # Direct text match
+                if cause_lower in text_lower:
+                    score += 1.0
+                
+                # Word overlap scoring
+                cause_words = cause_lower.split()
+                text_words = text_lower.split()
+                overlap = len(set(cause_words) & set(text_words))
+                if len(cause_words) > 0:
+                    score += overlap / len(cause_words) * 0.8
+                
+                # Check for related concept keywords
+                concept_keywords = concept_data.get('keywords', [])
+                for keyword in concept_keywords:
+                    if keyword in cause_lower:
+                        score += 0.3
+                
+                cause_scores[cause] = score
+            
+            # Select best cause
+            best_cause = max(cause_scores, key=cause_scores.get)
+            path.append(best_cause)
+            confidences['cause'] = min(0.9, 0.5 + cause_scores[best_cause])
+        else:
+            # Fallback to hierarchy-based cause
+            hierarchy_causes = self._get_valid_options('cause', path[:2])
+            if hierarchy_causes:
+                best_cause = self._score_options_by_text_relevance(
+                    hierarchy_causes, 'cause', text, path[:2]
+                )
+                path.append(best_cause)
+                confidences['cause'] = 0.6
+            else:
+                path.append('UNKNOWN CAUSE')
+                confidences['cause'] = 0.4
+        
+        # Step 3: Find the best remedy for this concept
+        remedies = concept_data.get('remedies', [])
+        if remedies:
+            # Score remedies based on problem-cause context and text
+            remedy_scores = {}
+            for remedy in remedies:
+                score = 0.0
+                remedy_lower = remedy.lower()
+                
+                # Direct text match
+                if remedy_lower in text_lower:
+                    score += 0.8
+                
+                # Context-based scoring (remedy should match problem/cause severity)
+                problem_lower = path[1].lower() if len(path) > 1 else ""
+                cause_lower = path[2].lower() if len(path) > 2 else ""
+                
+                # Simple heuristics for remedy appropriateness
+                if 'replace' in remedy_lower:
+                    if any(word in problem_lower + cause_lower for word in ['broken', 'defected', 'failed']):
+                        score += 0.5
+                elif 'repair' in remedy_lower:
+                    if any(word in problem_lower + cause_lower for word in ['damage', 'leak', 'loose']):
+                        score += 0.5
+                elif 'check' in remedy_lower:
+                    if any(word in problem_lower + cause_lower for word in ['no power', 'connection']):
+                        score += 0.5
+                
+                # Concept keyword relevance
+                concept_keywords = concept_data.get('keywords', [])
+                keyword_matches = sum(1 for keyword in concept_keywords if keyword in remedy_lower)
+                if len(concept_keywords) > 0:
+                    score += keyword_matches / len(concept_keywords) * 0.4
+                
+                remedy_scores[remedy] = score
+            
+            # Select best remedy
+            best_remedy = max(remedy_scores, key=remedy_scores.get)
+            path.append(best_remedy)
+            confidences['remedy'] = min(0.9, 0.5 + remedy_scores[best_remedy])
+        else:
+            # Fallback to hierarchy-based remedy
+            hierarchy_remedies = self._get_valid_options('remedy', path[:3])
+            if hierarchy_remedies:
+                best_remedy = self._score_options_by_text_relevance(
+                    hierarchy_remedies, 'remedy', text, path[:3]
+                )
+                path.append(best_remedy)
+                confidences['remedy'] = 0.6
+            else:
+                # Generate contextual remedy
+                if len(path) >= 3:
+                    default_remedies = self._get_default_remedies(path[0], path[1], path[2])
+                    path.append(default_remedies[0] if default_remedies else 'REPAIR')
+                else:
+                    path.append('REPAIR')
+                confidences['remedy'] = 0.4
+        
+        # Calculate overall confidence
+        overall_confidence = 1.0
+        for level_conf in confidences.values():
+            overall_confidence *= level_conf
+        
+        # Add concept coherence boost
+        concept_keywords = concept_data.get('keywords', [])
+        text_concept_matches = sum(1 for keyword in concept_keywords if keyword in text_lower)
+        if len(concept_keywords) > 0:
+            concept_relevance = text_concept_matches / len(concept_keywords)
+            overall_confidence = min(1.0, overall_confidence + concept_relevance * 0.2)
+        
+        # Build result
+        result = {
+            'path': path,
+            'overall_confidence': overall_confidence,
+            'confidences': confidences,
+            'source': 'concept_coherent_path',
+            'concept_used': concept_data.get('concept_name', 'unknown'),
+            'concept_relevance': concept_relevance if 'concept_relevance' in locals() else 0.0,
+            'fallback_used': len(path) < 4  # True if we couldn't complete the full path
+        }
 
     def _get_feedback_influenced_paths(self, text: str, top_k: int) -> List[Dict]:
         """Get paths that match restricted feedback patterns"""
@@ -930,6 +1111,45 @@ class EnhancedHierarchicalClassifier:
         all_paths.sort(key=lambda x: x['overall_confidence'], reverse=True)
         
         return all_paths
+    
+
+    
+    def _score_options_by_frequency(self, options: List[str], parent_path: List[str]) -> str:
+        """Score options based on frequency in training data and return best match"""
+        if not options:
+            return None
+        
+        option_scores = {}
+        
+        for option in options:
+            score = 0.0
+            
+            # Score based on frequency in path_frequencies
+            for path, freq in self.path_frequencies.items():
+                if option in path:
+                    # Give higher score if option appears in a path that shares more context
+                    shared_context = 0
+                    for i, parent_item in enumerate(parent_path):
+                        if i < len(path) and path[i] == parent_item:
+                            shared_context += 1
+                        else:
+                            break
+                    
+                    # Weight frequency by shared context
+                    context_weight = (shared_context + 1) / (len(parent_path) + 1)
+                    score += freq * context_weight
+            
+            # Fallback: if no frequency data, give base score
+            if score == 0.0:
+                score = 1.0
+            
+            option_scores[option] = score
+        
+        # Return option with highest score
+        if option_scores:
+            return max(option_scores.items(), key=lambda x: x[1])[0]
+        else:
+            return options[0]  # Fallback to first option
     def _get_concept_aware_paths(self, text: str, max_paths: int) -> List[Dict]:
         """Generate paths based on concept analysis"""
         text_lower = text.lower()
@@ -1266,42 +1486,3 @@ class EnhancedHierarchicalClassifier:
         
         # Store for use in fallback
         self.concept_fc_patterns = fc_cooccurrence
-
-
-    def get_feedback_stats(self) -> Dict:
-        """Get statistics about stored feedback"""
-        if not self.feedback_data:
-            return {"feedback_count": 0, "patterns": 0}
-        
-        pattern_count = len(self.pattern_weights)
-        recent_feedback = self.feedback_data[-5:] if len(self.feedback_data) >= 5 else self.feedback_data
-        
-        return {
-            "feedback_count": len(self.feedback_data),
-            "pattern_weights": pattern_count,
-            "recent_feedback": [
-                {
-                    "text": fb["text"][:50] + "..." if len(fb["text"]) > 50 else fb["text"],
-                    "path": fb["correct_path"],
-                    "timestamp": fb["timestamp"]
-                }
-                for fb in recent_feedback
-            ],
-            "sample_patterns": list(self.pattern_weights.keys())[:10]  # Show first 10 patterns
-        }
-
-    def load_model(self, filepath: str):
-        """Load enhanced model"""
-        with open(filepath, 'rb') as f:
-            model_data = pickle.load(f)
-        
-        self.models = model_data['models']
-        self.label_encoders = model_data['label_encoders']
-        self.feature_engineer = model_data['feature_engineer']
-        self.training_hierarchy = model_data.get('training_hierarchy', {})
-        self.full_hierarchy = model_data.get('full_hierarchy', {})
-        self.path_frequencies = model_data.get('path_frequencies', {})
-        self.confidence_threshold = model_data['confidence_threshold']
-        self.use_ensemble = model_data.get('use_ensemble', True)
-        
-        self.logger.info(f"Enhanced model loaded from {filepath}")
