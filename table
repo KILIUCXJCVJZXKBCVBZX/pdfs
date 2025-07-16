@@ -1,0 +1,203 @@
+<table width="100%" cellspacing="0" cellpadding="0" border="0" align="left" class="plinner">
+							<tbody><tr id="header_row_215442" style="">
+								<th role="columnheader" id="m11bb4840-content_0" class="text khtc" nowrap="true">
+								&nbsp;
+								<span>
+											<a tabindex="0" title="Sort" class="text pl ibhc" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) { sendEvent('sort','m11bb4840-content','0');}" href="javascript:sendEvent('sort','m11bb4840-content','0')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+	Service Request</a>
+									
+									</span>
+								
+							</th>
+								<th role="columnheader" id="m11bb4840-content_1" class="text khtc" nowrap="true">
+								&nbsp;
+								<span>
+											<a tabindex="0" title="Sort" class="text pl ibhc" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) { sendEvent('sort','m11bb4840-content','1');}" href="javascript:sendEvent('sort','m11bb4840-content','1')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+	Summary</a>
+									
+									</span>
+								
+							</th>
+								<th role="columnheader" id="m11bb4840-content_2" class="text khtc" nowrap="true">
+								&nbsp;
+								<span>
+											<a tabindex="0" title="Sort" class="text pl ibhc" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) { sendEvent('sort','m11bb4840-content','2');}" href="javascript:sendEvent('sort','m11bb4840-content','2')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+	Internal Priority</a>
+									
+									</span>
+								
+							</th>
+								<th role="columnheader" id="m11bb4840-content_3" class="text khtc" nowrap="true">
+								&nbsp;
+								<span>
+											<a tabindex="0" title="Sort" class="text pl ibhc" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) { sendEvent('sort','m11bb4840-content','3');}" href="javascript:sendEvent('sort','m11bb4840-content','3')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+	Location</a>
+									
+									</span>
+								
+							</th>
+								<th role="columnheader" id="m11bb4840-content_4" class="text khtc" nowrap="true">
+								&nbsp;
+								<span>
+											<a tabindex="0" title="Sort" class="text pl ibhc" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) { sendEvent('sort','m11bb4840-content','4');}" href="javascript:sendEvent('sort','m11bb4840-content','4')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+	Target Start</a>
+									
+									</span>
+								
+							</th>
+								<th role="columnheader" id="m11bb4840-content_5" class="text khtc" nowrap="true">
+								&nbsp;
+								<span>
+											<a tabindex="0" title="Sort" class="text pl ibhc" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) { sendEvent('sort','m11bb4840-content','5');}" href="javascript:sendEvent('sort','m11bb4840-content','5')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+	Target Finish</a>
+									
+									</span>
+								
+							</th>
+							</tr>
+	
+								<tr id="filter_row_215442" class="text rstfc" style="">
+									<td id="filter_cells_215442_0" class="rsfco" headers="m11bb4840-content_0">
+									&nbsp;
+									<span id="filter_dataspan_215442_0">
+											<input id="TICKETID@215442" type="text" onblur="rsportlet_filterActivate(this,false)" onfocus="rsportlet_filterActivate(this,true);setCurrentfocusId(event, this);" onkeypress="rsportlet_onkeypress(event,'m11bb4840-content',this.id)" onchange="rsportlet_onchange(event,this,this.id,'scportlets_pane2_resultsetportlet_215442')" onmouseup="rsportlet_onmouseup(this)" class="text ib" name="filter_TICKETID_215442" value="" tabindex="0" title="Service Request" size="5" maxlength="254">
+										</span>
+								 </td>
+									<td id="filter_cells_215442_1" class="rsfco" headers="m11bb4840-content_1">
+									&nbsp;
+									<span id="filter_dataspan_215442_1">
+											<input id="DESCRIPTION@215442" type="text" onblur="rsportlet_filterActivate(this,false)" onfocus="rsportlet_filterActivate(this,true);setCurrentfocusId(event, this);" onkeypress="rsportlet_onkeypress(event,'m11bb4840-content',this.id)" onchange="rsportlet_onchange(event,this,this.id,'scportlets_pane2_resultsetportlet_215442')" onmouseup="rsportlet_onmouseup(this)" class="text ib" name="filter_DESCRIPTION_215442" value="" tabindex="0" title="Summary" size="5" maxlength="254">
+										</span>
+								 </td>
+									<td id="filter_cells_215442_2" class="rsfco" headers="m11bb4840-content_2">
+									&nbsp;
+									<span id="filter_dataspan_215442_2">
+											<input id="INTERNALPRIORITY@215442" type="text" onblur="rsportlet_filterActivate(this,false)" onfocus="rsportlet_filterActivate(this,true);setCurrentfocusId(event, this);" onkeypress="rsportlet_onkeypress(event,'m11bb4840-content',this.id)" onchange="rsportlet_onchange(event,this,this.id,'scportlets_pane2_resultsetportlet_215442')" onmouseup="rsportlet_onmouseup(this)" class="text ib" name="filter_INTERNALPRIORITY_215442" value="" tabindex="0" title="Internal Priority" size="5" maxlength="254">
+										</span>
+								 </td>
+									<td id="filter_cells_215442_3" class="rsfco" headers="m11bb4840-content_3">
+									&nbsp;
+									<span id="filter_dataspan_215442_3">
+											<input id="LOCATION@215442" type="text" onblur="rsportlet_filterActivate(this,false)" onfocus="rsportlet_filterActivate(this,true);setCurrentfocusId(event, this);" onkeypress="rsportlet_onkeypress(event,'m11bb4840-content',this.id)" onchange="rsportlet_onchange(event,this,this.id,'scportlets_pane2_resultsetportlet_215442')" onmouseup="rsportlet_onmouseup(this)" class="text ib" name="filter_LOCATION_215442" value="" tabindex="0" title="Location" size="5" maxlength="254">
+										</span>
+								 </td>
+									<td id="filter_cells_215442_4" class="rsfco" headers="m11bb4840-content_4">
+									&nbsp;
+									<span id="filter_dataspan_215442_4">
+											<input id="TARGETSTART@215442" type="text" onblur="rsportlet_filterActivate(this,false)" onfocus="rsportlet_filterActivate(this,true);setCurrentfocusId(event, this);" onkeypress="rsportlet_onkeypress(event,'m11bb4840-content',this.id)" onchange="rsportlet_onchange(event,this,this.id,'scportlets_pane2_resultsetportlet_215442')" onmouseup="rsportlet_onmouseup(this)" class="text ib" name="filter_TARGETSTART_215442" value="" tabindex="0" title="Target Start" size="5" maxlength="254">
+										</span>
+								 </td>
+									<td id="filter_cells_215442_5" class="rsfco" headers="m11bb4840-content_5">
+									&nbsp;
+									<span id="filter_dataspan_215442_5">
+											<input id="TARGETFINISH@215442" type="text" onblur="rsportlet_filterActivate(this,false)" onfocus="rsportlet_filterActivate(this,true);setCurrentfocusId(event, this);" onkeypress="rsportlet_onkeypress(event,'m11bb4840-content',this.id)" onchange="rsportlet_onchange(event,this,this.id,'scportlets_pane2_resultsetportlet_215442')" onmouseup="rsportlet_onmouseup(this)" class="text ib" name="filter_TARGETFINISH_215442" value="" tabindex="0" title="Target Finish" size="5" maxlength="254">
+										</span>
+								 </td>
+								</tr>
+							<tr valign="top">
+								<td style="padding-left:5px" headers="m11bb4840-content_0">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214601');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214601')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">214996</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_0">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214601');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214601')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">Electrical Systems,Power Fluctuation</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_0">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214601');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214601')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">2</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_0">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214601');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214601')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">OJ-Z02-B841-F01-103</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_0">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214601');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214601')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">7/12/25 2:54 PM</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_0">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214601');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214601')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">7/12/25 8:54 PM</span>
+								</a>
+							</td>
+							</tr>
+						<tr valign="top">
+							<td colspan="6" height="1" class="psep"></td>
+						</tr>
+							<tr valign="top">
+								<td style="padding-left:5px" headers="m11bb4840-content_1">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214603');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214603')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">214998</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_1">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214603');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214603')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">Civil Services,Lock And Key,Replace door lock</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_1">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214603');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214603')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">3</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_1">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214603');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214603')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">OJ-Z02-B841-F01-103</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_1">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214603');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214603')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">7/12/25 6:53 PM</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_1">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214603');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214603')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">7/13/25 10:53 AM</span>
+								</a>
+							</td>
+							</tr>
+						<tr valign="top">
+							<td colspan="6" height="1" class="psep"></td>
+						</tr>
+							<tr valign="top">
+								<td style="padding-left:5px" headers="m11bb4840-content_2">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214605');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214605')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">215000</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_2">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214605');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214605')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">Air Condition,Not Working</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_2">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214605');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214605')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">3</span>
+								</a>
+							</td>
+								<td style="padding-left:5px" headers="m11bb4840-content_2">
+								<a tabindex="0" title="Open Record" class="text rsd pkr
+" onkeypress="if(hasKeyCode(event,'KEYCODE_ENTER')) {sendEvent('openrecord','m11bb4840-content','sr-214605');}" href="javascript:sendEvent('openrecord','m11bb4840-content','sr-214605')" onmouseout="return noStatus();" onfocus="return noStatus();" onmouseover="return noStatus();">
+									<span class="portlet_nowrap">OJ-Z02-B824-F05-502</span>
+								</a>
+							</td>
